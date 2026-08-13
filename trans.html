@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Realtime Speech & Translate</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; max-width: 800px; margin: auto; }
+        .box { background: white; padding: 15px; border: 1px solid #ccc; border-radius: 5px; margin-top: 15px; min-height: 60px; font-size: 1.2em; }
+        #original { color: #333; }
+        #translated { color: #1a73e8; font-weight: bold; }
+        .status { color: gray; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <h2>Голосовой переводчик в реальном времени</h2>
+    <p class="status" id="status">Нажмите разрешить микрофон...</p>
+
+    <h3>Оригинал (EN):</h3>
+    <div id="original" class="box"></div>
+
+    <h3>Перевод (RU):</h3>
+    <div id="translated" class="box"></div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const originalEl = document.getElementById('original');
+        const translatedEl = document.getElementById('translated');
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            statusEl.innerText = "Ошибка: Ваш браузер не поддерживает распознавание речи. Используйте Google Chrome.";
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US'; 
+
+            recognition.onstart = () => {
+                statusEl.innerText = "🎤 Слушаю микрофон/аудио... Говорите.";
+            };
+
+            recognition.onresult = async (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const text = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += text;
+                    } else {
+                        interimTranscript += text;
+                    }
+                }
+
+                const currentText = finalTranscript || interimTranscript;
+                if (currentText) {
+                    originalEl.innerText = currentText;
+
+                    // Используем альтернативный API переводчика без жестких суточных лимитов
+                    try {
+                        let response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&q=${encodeURIComponent(currentText)}`);
+                        let data = await response.json();
+                        if (data && data[0]) {
+                            let translatedText = data[0].map(item => item[0]).join('');
+                            translatedEl.innerText = translatedText;
+                        }
+                    } catch (e) {
+                        console.error("Ошибка перевода:", e);
+                    }
+                }
+            };
+
+            recognition.onerror = (e) => {
+                statusEl.innerText = "Ошибка распознавания: " + e.error;
+            };
+
+            recognition.onend = () => {
+                setTimeout(() => { recognition.start(); }, 300);
+            };
+
+            recognition.start();
+        }
+    </script>
+</body>
+</html>
